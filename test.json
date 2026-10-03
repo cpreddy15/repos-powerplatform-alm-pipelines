@@ -1,0 +1,18 @@
+{
+  "EnvironmentVariables": [
+    { "SchemaName": "cm_SharePointSiteUrl", "Value": "https://contoso.sharepoint.com/sites/cases-test" },
+    { "SchemaName": "cm_SupportEmail", "Value": "support-test@contoso.example" }
+  ],
+  "ConnectionReferences": [
+    {
+      "LogicalName": "cm_sharedsharepointonline_ref",
+      "ConnectionId": "<sharepoint-connection-id-in-test>",
+      "ConnectorId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+    },
+    {
+      "LogicalName": "cm_sharedoffice365_ref",
+      "ConnectionId": "<outlook-connection-id-in-test>",
+      "ConnectorId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+    }
+  ]
+}

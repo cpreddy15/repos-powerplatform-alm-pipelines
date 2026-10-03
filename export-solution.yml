@@ -1,0 +1,56 @@
+# Export a solution from Dev and commit the unpacked source to Git.
+# Run manually after finishing a change in Dev.
+
+trigger: none
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  SolutionName: 'CaseManagement'
+
+steps:
+  - checkout: self
+    persistCredentials: true
+
+  - task: PowerPlatformToolInstaller@2
+    inputs:
+      DefaultVersion: true
+
+  - task: PowerPlatformExportSolution@2
+    displayName: 'Export unmanaged'
+    inputs:
+      authenticationType: 'PowerPlatformSPN'
+      PowerPlatformSPN: 'PP-Dev'
+      SolutionName: '$(SolutionName)'
+      SolutionOutputFile: '$(Build.ArtifactStagingDirectory)/$(SolutionName).zip'
+      Managed: false
+      AsyncOperation: true
+      MaxAsyncWaitTime: '60'
+
+  - task: PowerPlatformExportSolution@2
+    displayName: 'Export managed'
+    inputs:
+      authenticationType: 'PowerPlatformSPN'
+      PowerPlatformSPN: 'PP-Dev'
+      SolutionName: '$(SolutionName)'
+      SolutionOutputFile: '$(Build.ArtifactStagingDirectory)/$(SolutionName)_managed.zip'
+      Managed: true
+      AsyncOperation: true
+      MaxAsyncWaitTime: '60'
+
+  - task: PowerPlatformUnpackSolution@2
+    displayName: 'Unpack (both)'
+    inputs:
+      SolutionInputFile: '$(Build.ArtifactStagingDirectory)/$(SolutionName).zip'
+      SolutionTargetFolder: '$(Build.SourcesDirectory)/solutions/$(SolutionName)'
+      SolutionType: 'Both'
+
+  - script: |
+      git config user.email "alm-pipeline@example.com"
+      git config user.name "ALM Pipeline"
+      git checkout -B main
+      git add --all
+      git commit -m "Export $(SolutionName) from Dev [skip ci]"
+      git push origin main
+    displayName: 'Commit to Git'

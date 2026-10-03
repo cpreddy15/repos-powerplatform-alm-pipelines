@@ -1,0 +1,84 @@
+# Build a managed solution from source and deploy Test → Prod.
+
+trigger:
+  branches:
+    include: [ main ]
+  paths:
+    include: [ solutions/* ]
+
+variables:
+  SolutionName: 'CaseManagement'
+
+stages:
+  - stage: Build
+    jobs:
+      - job: Pack
+        pool:
+          vmImage: 'windows-latest'
+        steps:
+          - task: PowerPlatformToolInstaller@2
+            inputs:
+              DefaultVersion: true
+
+          - task: PowerPlatformPackSolution@2
+            displayName: 'Pack managed solution'
+            inputs:
+              SolutionSourceFolder: '$(Build.SourcesDirectory)/solutions/$(SolutionName)'
+              SolutionOutputFile: '$(Build.ArtifactStagingDirectory)/$(SolutionName)_managed.zip'
+              SolutionType: 'Managed'
+
+          - task: CopyFiles@2
+            inputs:
+              SourceFolder: 'deployment-settings'
+              TargetFolder: '$(Build.ArtifactStagingDirectory)/settings'
+
+          - publish: '$(Build.ArtifactStagingDirectory)'
+            artifact: drop
+
+  - stage: DeployTest
+    dependsOn: Build
+    jobs:
+      - deployment: ImportTest
+        environment: 'Test'
+        pool:
+          vmImage: 'windows-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: PowerPlatformToolInstaller@2
+                  inputs:
+                    DefaultVersion: true
+                - task: PowerPlatformImportSolution@2
+                  inputs:
+                    authenticationType: 'PowerPlatformSPN'
+                    PowerPlatformSPN: 'PP-Test'
+                    SolutionInputFile: '$(Pipeline.Workspace)/drop/$(SolutionName)_managed.zip'
+                    UseDeploymentSettingsFile: true
+                    DeploymentSettingsFile: '$(Pipeline.Workspace)/drop/settings/test.json'
+                    AsyncOperation: true
+                    MaxAsyncWaitTime: '60'
+
+  - stage: DeployProd
+    dependsOn: DeployTest
+    jobs:
+      - deployment: ImportProd
+        environment: 'Prod'      # approval check configured on this environment
+        pool:
+          vmImage: 'windows-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: PowerPlatformToolInstaller@2
+                  inputs:
+                    DefaultVersion: true
+                - task: PowerPlatformImportSolution@2
+                  inputs:
+                    authenticationType: 'PowerPlatformSPN'
+                    PowerPlatformSPN: 'PP-Prod'
+                    SolutionInputFile: '$(Pipeline.Workspace)/drop/$(SolutionName)_managed.zip'
+                    UseDeploymentSettingsFile: true
+                    DeploymentSettingsFile: '$(Pipeline.Workspace)/drop/settings/prod.json'
+                    AsyncOperation: true
+                    MaxAsyncWaitTime: '60'
